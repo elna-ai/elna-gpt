@@ -1,0 +1,8 @@
+[package]
+name = "inference"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+onnxruntime = {version="0.0.14", features = ["model-fetching"]}
+tokenizers = { version = "0.20.0", features = ["http"] }
