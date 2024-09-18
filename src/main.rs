@@ -1,107 +1,132 @@
-use onnxruntime::ndarray::prelude::*;
-use onnxruntime::ndarray::{ArrayD, Axis, IxDyn}; // Import necessary types
-use onnxruntime::GraphOptimizationLevel;
-use onnxruntime::{environment::Environment, tensor::OrtOwnedTensor, LoggingLevel};
-use std::error::Error;
-use tokenizers::Encoding;
-use tokenizers::Tokenizer;
+use ndarray_npy::read_npy;
+use tract_ndarray::{ArrayD, ArrayViewD, IxDyn};
+use tract_onnx::prelude::*;
 
-fn cumulative_sum(arr: &ArrayD<i32>, axis: Axis) -> ArrayD<i32> {
-    let mut result = arr.clone();
+fn main() -> TractResult<()> {
+    // Load the ONNX model
+    let model = tract_onnx::onnx()
+        .model_for_path("models/gpt2_with_kv.onnx")?
+        .into_optimized()?
+        .into_runnable()?;
 
-    for mut row in result.axis_iter_mut(axis) {
-        for i in 1..row.len() {
-            row[i] += row[i - 1];
+    // Load the serialized past_key_values
+    //let serialized_past_key_values: ArrayD<f32> = read_npy("../../python/onnx_model/end_of_text.npy")
+    //    .expect("Failed to read end_of_text.npy");
+
+    // Convert past_key_values to Tensor
+    //let mut past_key_values_tensor = serialized_past_key_values.into_tensor();
+    let mut past_key_values_tensor = create_empty_past_key_values(24, 1, 12, 0, 64)?;
+
+    // Initialize input tokens and attention mask
+    let mut input_ids: Vec<i64> = vec![2061, 318, 534, 4004, 6332, 30]; // Use appropriate initial token
+    let mut attention_mask: Vec<i8> = vec![1, 1, 1, 1, 1, 1];
+
+    // Loop for text generation
+    for j in 0..15 {
+        // Example: 3 iterations
+        println!(
+            "Iteration: {}, Input IDs Length: {}, Attention Mask Length: {}",
+            j,
+            input_ids.len(),
+            attention_mask.len()
+        );
+
+        let input_ids_tensor = create_tensor_i64(&input_ids)?;
+        let attention_mask_tensor = create_tensor_i8(&attention_mask)?;
+
+        // Print tensor details
+        //println!("Input IDs Tensor: {:?}", input_ids_tensor);
+        //println!("Input IDs Tensor Shape: {:?}", input_ids_tensor.shape());
+        //println!("Input IDs Tensor DType: {:?}", input_ids_tensor.datum_type());
+
+        //println!("Attention Mask Tensor: {:?}", attention_mask_tensor);
+        //println!("Attention Mask Tensor Shape: {:?}", attention_mask_tensor.shape());
+        //println!("Attention Mask Tensor DType: {:?}", attention_mask_tensor.datum_type());
+
+        //println!("Past Key Values Tensor: {:?}", past_key_values_tensor);
+        //println!("Past Key Values Tensor Shape: {:?}", past_key_values_tensor.shape());
+        //println!("Past Key Values Tensor DType: {:?}", past_key_values_tensor.datum_type());
+
+        let inputs: TVec<TValue> = tvec!(
+            input_ids_tensor.into(),
+            attention_mask_tensor.into(),
+            past_key_values_tensor.clone().into()
+        );
+
+        // Debugging shapes
+        for (i, input) in inputs.iter().enumerate() {
+            println!("Input {}: {:?}", i, input.shape());
+            println!("Input {} DType: {:?}", i, input.datum_type());
         }
-    }
-    result
-}
 
-fn get_tokenizer(model_name_or_path: &str) -> Result<Tokenizer, Box<dyn Error + Send + Sync>> {
-    let mut tokenizer = Tokenizer::from_pretrained(model_name_or_path, None)?;
-    let pad_id = tokenizer.get_vocab(false)["<|endoftext|>"];
-    tokenizer.with_padding(Some(tokenizers::PaddingParams {
-        strategy: tokenizers::PaddingStrategy::BatchLongest,
-        direction: tokenizers::PaddingDirection::Left,
-        pad_to_multiple_of: None,
-        pad_id: pad_id,
-        pad_type_id: 0,
-        pad_token: "<|endoftext|>".to_string(),
-    }));
+        // Run the inference
+        let outputs = match model.run(inputs) {
+            Ok(o) => o,
+            Err(e) => {
+                println!("Model run failed: {:?}", e);
+                return Err(e);
+            }
+        };
 
-    Ok(tokenizer)
-}
+        // Extract logits and past_key_values
+        //let logits = outputs[0].to_array_view::<f32>()?;
 
-fn get_example_inputs(
-    prompt_text: &str,
-) -> (ArrayD<i32>, ArrayD<i32>, ArrayD<i32>, Vec<ArrayD<i32>>) {
-    let num_attention_heads = 12;
-    let num_layers = 12;
-    let hidden_size = 768;
+        past_key_values_tensor = outputs[1].clone().into_tensor();
 
-    let tokenizer = get_tokenizer("gpt2").expect("Failed to load tokenizer");
+        let next_token_tensor = outputs[0].to_array_view::<i64>()?;
+        let next_token = next_token_tensor[[0, 0]];
+        // Print the next token for debugging
+        println!("Next token: {}", next_token);
 
-    let encoding: Encoding = tokenizer.encode(prompt_text, true).unwrap();
+        // Print the shape of past_key_values for debugging
+        //println!("Past Key Values Shape: {:?}", past_key_values_tensor.shape());
 
-    let input_ids: Vec<u32> = encoding.get_ids().to_vec();
-    let attention_mask: Vec<u32> = encoding.get_attention_mask().to_vec();
-
-    let input_ids = ArrayD::from_shape_vec(IxDyn(&[1, input_ids.len()]), input_ids).unwrap();
-    let attention_mask =
-        ArrayD::from_shape_vec(IxDyn(&[1, attention_mask.len()]), attention_mask).unwrap();
-
-    let mut position_ids = cumulative_sum(&attention_mask.mapv(|mask| mask as i32), Axis(1));
-    position_ids.iter_mut().for_each(|x| *x = (*x).max(0));
-
-    let mut empty_past: Vec<ArrayD<i32>> = Vec::new();
-    let batch_size = input_ids.shape()[0];
-    let hidden_size_per_head = hidden_size / num_attention_heads;
-
-    let past_shape = IxDyn(&[2, batch_size, num_attention_heads, 0, hidden_size_per_head]);
-
-    for _ in 0..num_layers {
-        empty_past.push(ArrayD::zeros(past_shape.clone()));
+        // Append the next token and update the attention mask
+        input_ids = vec![next_token];
+        attention_mask.push(1);
     }
 
-    (
-        input_ids.mapv(|x| x as i32),
-        attention_mask.mapv(|x| x as i32),
-        position_ids,
-        empty_past,
-    )
-}
-
-fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
-    // Initialize the ONNX environment
-    let environment = Environment::builder()
-        .with_name("test")
-        .with_log_level(LoggingLevel::Verbose)
-        .build()?;
-
-    // Load the ONNX model session
-    let mut session = environment
-        .new_session_builder()?
-        .with_optimization_level(GraphOptimizationLevel::Basic)?
-        .with_number_threads(1)?
-        .with_model_from_file("models/gpt2_onnxv2/gpt2.onnx")?;
-
-    let input_prompt = "Hello";
-    let (input_ids, attention_mask, position_ids, empty_past) = get_example_inputs(input_prompt);
-
-    let mut ort_inputs: Vec<ArrayD<i32>> = Vec::new();
-
-    ort_inputs.push(input_ids);
-    ort_inputs.push(attention_mask);
-    ort_inputs.push(position_ids);
-
-    for past_i in empty_past.iter() {
-        ort_inputs.push(past_i.clone());
-    }
-
-    // Run inference
-    let ort_outputs: Vec<OrtOwnedTensor<f32, IxDyn>> = session.run(ort_inputs)?;
-
-    println!("Model output: {:?}", ort_outputs);
+    println!("Final input_ids: {:?}", input_ids);
+    println!("Final attention_mask: {:?}", attention_mask);
 
     Ok(())
+}
+
+fn create_tensor_i64(data: &[i64]) -> TractResult<Tensor> {
+    let shape = [1, data.len()];
+    let array = tract_ndarray::Array::from_shape_vec(shape, data.to_vec())
+        .map_err(|_| anyhow::anyhow!("Failed to create tensor from shape and values"))?;
+    Ok(array.into_tensor())
+}
+
+fn create_tensor_i8(data: &[i8]) -> TractResult<Tensor> {
+    let shape = [1, data.len()];
+    let array = ArrayD::from_shape_vec(IxDyn(&shape), data.to_vec())
+        .map_err(|_| anyhow::anyhow!("Failed to create tensor from shape and values"))?;
+    Ok(array.into_tensor())
+}
+
+fn argmax(logits: ArrayViewD<f32>) -> TractResult<i64> {
+    Ok(logits
+        .iter()
+        .enumerate()
+        .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
+        .unwrap()
+        .0 as i64)
+}
+
+fn create_empty_past_key_values(
+    num_layers: usize,
+    batch_size: usize,
+    num_heads: usize,
+    seq_length: usize,
+    head_dim: usize,
+) -> TractResult<Tensor> {
+    let shape = [num_layers, batch_size, num_heads, seq_length, head_dim];
+    let array = tract_ndarray::Array::from_shape_vec(
+        IxDyn(&shape),
+        vec![0.0_f32; num_layers * batch_size * num_heads * seq_length * head_dim],
+    )
+    .map_err(|_| anyhow::anyhow!("Failed to create tensor from shape and values"))?;
+    Ok(array.into_tensor())
 }
