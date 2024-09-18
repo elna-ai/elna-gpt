@@ -1,6 +1,42 @@
 use ndarray_npy::read_npy;
+use rust_tokenizers::tokenizer::{Gpt2Tokenizer, Tokenizer, TruncationStrategy};
 use tract_ndarray::{ArrayD, ArrayViewD, IxDyn};
 use tract_onnx::prelude::*;
+const TARGET_LEN: usize = 256;
+
+fn pad_vector<T: Default + Clone>(input_ids: Vec<T>, target_len: usize) -> Vec<T> {
+    let mut padded = input_ids.clone();
+    padded.resize(target_len, T::default());
+    padded
+}
+fn get_input_ids(text: &str) -> (Vec<i64>, Vec<i8>) {
+    let lower_case = false;
+    let tokenizer = Gpt2Tokenizer::from_file_with_special_token_mapping(
+        "tokenizer/vocab.json",
+        "tokenizer/merges.txt",
+        lower_case,
+        "tokenizer/special_tokens_map.json",
+    )
+    .unwrap();
+
+    // Tokenize the input text
+    let tokens = tokenizer.encode(
+        text,
+        None,
+        TARGET_LEN,
+        &TruncationStrategy::DoNotTruncate,
+        0,
+    );
+
+    // Pad the token IDs to TARGET_LEN
+    let mut input_ids = tokens.token_ids.clone();
+    // input_ids = pad_vector(tokens.token_ids.clone(), TARGET_LEN);
+    // Create attention mask: 1 for real tokens, 0 for padding
+    let attention_mask: Vec<i8> = tokens.token_ids.iter().map(|_| 1).collect();
+    // let padded_attention_mask: Vec<i8> = pad_vector(attention_mask, TARGET_LEN);
+
+    (input_ids, attention_mask)
+}
 
 fn main() -> TractResult<()> {
     // Load the ONNX model
@@ -17,9 +53,10 @@ fn main() -> TractResult<()> {
     //let mut past_key_values_tensor = serialized_past_key_values.into_tensor();
     let mut past_key_values_tensor = create_empty_past_key_values(24, 1, 12, 0, 64)?;
 
+    let input = "hello";
+
     // Initialize input tokens and attention mask
-    let mut input_ids: Vec<i64> = vec![2061, 318, 534, 4004, 6332, 30]; // Use appropriate initial token
-    let mut attention_mask: Vec<i8> = vec![1, 1, 1, 1, 1, 1];
+    let (mut input_ids, mut attention_mask) = get_input_ids("hello");
 
     // Loop for text generation
     for j in 0..15 {
