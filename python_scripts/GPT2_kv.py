@@ -1,4 +1,6 @@
-#"""
+# """
+import onnxruntime as ort
+import onnx
 import copy
 
 from transformers import GPT2LMHeadModel, GPT2Tokenizer
@@ -25,7 +27,8 @@ past_key_values = outputs.past_key_values
 past_key_values_init = copy.deepcopy(past_key_values)
 
 print("Initial Logits:", logits.shape)
-print("Initial Past Key Values Shapes:", [pkv[0].shape for pkv in past_key_values])
+print("Initial Past Key Values Shapes:", [
+      pkv[0].shape for pkv in past_key_values])
 
 # Prepare inputs for the second run
 new_input_text = " sport?\n"
@@ -40,7 +43,8 @@ extended_attention_mask_init = extended_attention_mask
 
 # Run the model with past_key_values and extended attention mask
 with torch.no_grad():
-    outputs = model(new_input_ids, attention_mask=extended_attention_mask, past_key_values=past_key_values, use_cache=True)
+    outputs = model(new_input_ids, attention_mask=extended_attention_mask,
+                    past_key_values=past_key_values, use_cache=True)
 logits = outputs.logits
 print(logits.shape)
 past_key_values = outputs.past_key_values
@@ -51,7 +55,6 @@ for pkv in past_key_values:
     print("\t pkv:", len(pkv))
     for pkvi in pkv:
         print("\t", pkvi.shape)
-
 
 
 ##################################################################################################
@@ -68,12 +71,14 @@ output_ids = []
 # Run the model with past_key_values and extended attention mask
 for i in range(5):
     with torch.no_grad():
-        outputs = model(next_input, attention_mask=extended_attention_mask, past_key_values=past_key_values, use_cache=True)
+        outputs = model(next_input, attention_mask=extended_attention_mask,
+                        past_key_values=past_key_values, use_cache=True)
     current_out = torch.argmax(outputs.logits[:, -1, :]).item()
-    output_ids.append( current_out )
+    output_ids.append(current_out)
     next_input = torch.tensor([[current_out]])
     past_key_values = outputs.past_key_values
-    extended_attention_mask = torch.cat([ extended_attention_mask, torch.ones((1,1)) ], dim=1)
+    extended_attention_mask = torch.cat(
+        [extended_attention_mask, torch.ones((1, 1))], dim=1)
 
 print('Output', output_ids)
 print(logits.shape)
@@ -98,11 +103,12 @@ class GPT2Wrapper(torch.nn.Module):
                 for i in range(0, 2 * self.num_layers, 2)
             )
 
-        outputs = self.model(input_ids, attention_mask=attention_mask, past_key_values=past_key_values, use_cache=True)
-        outputs_id = torch.argmax(outputs.logits[:, -1, :], dim=-1, keepdim=True)
+        outputs = self.model(input_ids, attention_mask=attention_mask,
+                             past_key_values=past_key_values, use_cache=True)
+        logits = outputs.logits[:, -1, :]  # Get logits for the last token
         past_key_values_flat = torch.cat(
             [torch.stack(pk, dim=0) for pk in outputs.past_key_values], dim=0)
-        return outputs_id, past_key_values_flat
+        return logits, past_key_values_flat
 
     def freeze_parameters(self):
         for param in self.parameters():
@@ -114,15 +120,15 @@ wrapper = GPT2Wrapper(model)
 wrapper.freeze_parameters()
 
 next_input = torch.cat([input_ids, new_input_ids], dim=1)
-#past_key_values = torch.zeros( torch.Size([12, 2, 1, 12, 1, 64]) )
-#past_key_values = torch.zeros( torch.Size([24, 12, 1, 64]) )
-past_key_values = torch.zeros( torch.Size([24, 1, 12, 1, 64]) )
+# past_key_values = torch.zeros( torch.Size([12, 2, 1, 12, 1, 64]) )
+# past_key_values = torch.zeros( torch.Size([24, 12, 1, 64]) )
+past_key_values = torch.zeros(torch.Size([24, 1, 12, 1, 64]))
 extended_attention_mask = copy.deepcopy(extended_attention_mask_init)
 
 past_key_values = copy.deepcopy(past_key_values_init)
-#past_key_values_flat = torch.stack(
+# past_key_values_flat = torch.stack(
 #    [torch.cat([pk[0].unsqueeze(0), pk[1].unsqueeze(0)], dim=0) for pk in past_key_values], dim=0)
-#past_key_values_flat = torch.cat(
+# past_key_values_flat = torch.cat(
 #    [torch.cat(pk, dim=0) for pk in past_key_values], dim=0)
 past_key_values_flat = torch.cat(
     [torch.stack(pk, dim=0) for pk in past_key_values], dim=0)
@@ -140,8 +146,9 @@ with torch.no_grad():
     print("past_key_values:", past_key_values.shape)
     '''
 
-    #output_id, past_key_values_2 = wrapper(new_input_ids, extended_attention_mask, past_key_values_flat)
-    logits, past_key_values_2 = wrapper(new_input_ids, extended_attention_mask, past_key_values_flat)
+    # output_id, past_key_values_2 = wrapper(new_input_ids, extended_attention_mask, past_key_values_flat)
+    logits, past_key_values_2 = wrapper(
+        new_input_ids, extended_attention_mask, past_key_values_flat)
     output_id = torch.argmax(outputs.logits[:, -1, :], dim=-1, keepdim=True)
     print("Second pass:")
     print("output_id:", output_id)
@@ -151,8 +158,8 @@ with torch.no_grad():
     print("past_key_values_2:", past_key_values_2.shape)
 
 
-past_key_values_zero = torch.zeros( torch.Size([12, 2, 1, 12, 1, 64]) )
-attention_mask_zero = torch.cat([attention_mask, torch.ones(1,1)], dim=-1)
+past_key_values_zero = torch.zeros(torch.Size([12, 2, 1, 12, 1, 64]))
+attention_mask_zero = torch.cat([attention_mask, torch.ones(1, 1)], dim=-1)
 extended_attention_mask = extended_attention_mask.to(torch.int8)
 print(attention_mask_zero.shape)
 # Export to ONNX
@@ -169,29 +176,29 @@ torch.onnx.export(
         "past_key_values_input": {1: "batch_size", 3: "last_sequence"},
         "past_key_values_output": {1: "batch_size", 3: "new_and_last_sequence"}
     },
-    opset_version=11
+    opset_version=14
 )
 
-#"""
-import onnx
-import onnxruntime as ort
+# """
 
 # Verify the exported ONNX model
-onnx_model = onnx.load("../../../../modclub/rust-connect-py-ai-to-ic/python/onnx_model/gpt2_with_kv.onnx")
+onnx_model = onnx.load(
+    "../../../../modclub/rust-connect-py-ai-to-ic/python/onnx_model/gpt2_with_kv.onnx")
 onnx.checker.check_model(onnx_model)
 
 # Initialize ONNX Runtime session
-ort_session = ort.InferenceSession("../../../../modclub/rust-connect-py-ai-to-ic/python/onnx_model/gpt2_with_kv.onnx")
+ort_session = ort.InferenceSession(
+    "../../../../modclub/rust-connect-py-ai-to-ic/python/onnx_model/gpt2_with_kv.onnx")
 
 
-#next_input = torch.cat([input_ids, new_input_ids], dim=1)
-#past_key_values = torch.zeros( torch.Size([12, 2, 1, 12, 1, 64]) )
+# next_input = torch.cat([input_ids, new_input_ids], dim=1)
+# past_key_values = torch.zeros( torch.Size([12, 2, 1, 12, 1, 64]) )
 extended_attention_mask = copy.deepcopy(extended_attention_mask_init)
 extended_attention_mask = extended_attention_mask.to(torch.int8)
 past_key_values = copy.deepcopy(past_key_values_init)
-#past_key_values_flat = torch.stack(
+# past_key_values_flat = torch.stack(
 #    [torch.cat([pk[0].unsqueeze(0), pk[1].unsqueeze(0)], dim=0) for pk in past_key_values], dim=0)
-#past_key_values_flat = torch.cat(
+# past_key_values_flat = torch.cat(
 #    [torch.cat(pk, dim=0) for pk in past_key_values], dim=0)
 past_key_values_flat = torch.cat(
     [torch.stack(pk, dim=0) for pk in past_key_values], dim=0)
@@ -213,7 +220,7 @@ onnx_inputs = {
 }
 
 output_ids = []
-#for i in range(3):
+# for i in range(3):
 # Run inference
 outputs = ort_session.run(None, onnx_inputs)
 
@@ -226,12 +233,11 @@ print(f"Past Key Values: {past_key_values_ort.shape}")
 
 #########################################################
 
-import torch
 
 next_input = torch.cat([input_ids, new_input_ids], dim=1)
 next_input_ort = next_input.numpy()
 
-past_key_values_zero = torch.zeros( torch.Size([12, 2, 1, 12, 1, 64]) )
+past_key_values_zero = torch.zeros(torch.Size([12, 2, 1, 12, 1, 64]))
 
 
 extended_attention_mask = copy.deepcopy(extended_attention_mask_init)
@@ -252,7 +258,6 @@ onnx_inputs = {
 }
 
 
-
 output_ids = []
 for i in range(15):
 
@@ -263,7 +268,8 @@ for i in range(15):
     print(f"Output ID: {output_id_ort}")
     print(f"Past Key Values: {past_key_values_ort.shape}")
     next_input = torch.tensor([[current_out]])
-    extended_attention_mask = torch.cat([ extended_attention_mask, torch.ones((1,1), dtype=extended_attention_mask.dtype) ], dim=1) \
+    extended_attention_mask = torch.cat([extended_attention_mask, torch.ones(
+        (1, 1), dtype=extended_attention_mask.dtype)], dim=1)
     extended_attention_mask_ort = extended_attention_mask.numpy()
 
     # Create input feed dictionary
