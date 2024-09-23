@@ -16,7 +16,7 @@ impl Config {
     fn new() -> Self {
         Self {
             target_len: 256,
-            model_path: "models/gpt2_with_kv.onnx".to_string(),
+            model_path: "models/gpt2_with_kv_logits.onnx".to_string(),
             tokenizer_vocab_path: "tokenizer/vocab.json".to_string(),
             tokenizer_merges_path: "tokenizer/merges.txt".to_string(),
             tokenizer_special_tokens_path: "tokenizer/special_tokens_map.json".to_string(),
@@ -67,16 +67,21 @@ impl TextGenerator {
             );
 
             let outputs = self.model.run(inputs)?;
-            println!("{:?}", outputs[0]);
 
+            let logits = outputs[0].to_array_view::<f32>()?;
             past_key_values_tensor = outputs[1].clone().into_tensor();
+            println!("{:?}", past_key_values_tensor);
+            // Use argmax to get the next token ID
+            let next_token_id = logits
+                .index_axis(ndarray::Axis(1), 0)
+                .iter()
+                .enumerate()
+                .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
+                .map(|(index, _)| index as i64)
+                .unwrap();
 
-            let next_token_tensor = outputs[0].to_array_view::<i64>()?;
-            println!("{:?}", next_token_tensor);
-            let next_token = next_token_tensor[[0, 0]];
-            println!("{:?}", next_token);
-            generated_tokens.push(next_token);
-            input_ids = vec![next_token];
+            generated_tokens.push(next_token_id);
+            input_ids = vec![next_token_id];
             attention_mask.push(1);
         }
 
