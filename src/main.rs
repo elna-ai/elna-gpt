@@ -316,3 +316,176 @@ fn create_empty_past_key_values(
     )?;
     Ok(array.into_tensor())
 }
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn run_generation_test(
+        generator: &TextGenerator,
+        input: &str,
+        num_tokens: usize,
+        config: GenerateConfig,
+        use_top_k: bool,
+        use_top_p: bool,
+        sampling_method: &SamplingMethod, // Change to reference
+    ) {
+        let result = generator
+            .generate(
+                input,
+                num_tokens,
+                config.clone(),
+                use_top_k,
+                use_top_p,
+                sampling_method.clone(), // Clone if needed
+            )
+            .unwrap();
+        println!(
+            "Result (Top-k: {}, Top-p: {}, Method: {:?}): {}",
+            use_top_k, use_top_p, sampling_method, result
+        );
+    }
+    // Define a single instance of GenerateConfig at the module level
+    #[test]
+    fn test_top_k_sampling() {
+        let config = Config::new();
+        let generator = TextGenerator::new(config).unwrap();
+        let input = "Test input for generation.";
+        let num_tokens = 15;
+
+        run_generation_test(
+            &generator,
+            input,
+            num_tokens,
+            GenerateConfig::new(),
+            true,
+            false,
+            &SamplingMethod::Sampling,
+        );
+    }
+
+    #[test]
+    fn test_top_k_argmax() {
+        let config = Config::new();
+        let generator = TextGenerator::new(config).unwrap();
+        let input = "Test input for generation.";
+        let num_tokens = 15;
+
+        run_generation_test(
+            &generator,
+            input,
+            num_tokens,
+            GenerateConfig::new(),
+            true,
+            false,
+            &SamplingMethod::Argmax,
+        );
+    }
+
+    #[test]
+    fn test_top_p_sampling() {
+        let config = Config::new();
+        let generator = TextGenerator::new(config).unwrap();
+        let input = "Test input for generation.";
+        let num_tokens = 15;
+
+        run_generation_test(
+            &generator,
+            input,
+            num_tokens,
+            GenerateConfig::new(),
+            false,
+            true,
+            &SamplingMethod::Sampling,
+        );
+    }
+
+    #[test]
+    fn test_top_p_argmax() {
+        let config = Config::new();
+        let generator = TextGenerator::new(config).unwrap();
+        let input = "Test input for generation.";
+        let num_tokens = 15;
+
+        run_generation_test(
+            &generator,
+            input,
+            num_tokens,
+            GenerateConfig::new(),
+            false,
+            true,
+            &SamplingMethod::Argmax,
+        );
+    }
+
+    #[test]
+    fn test_top_k_and_top_p_sampling() {
+        let config = Config::new();
+        let generator = TextGenerator::new(config).unwrap();
+        let input = "Test input for generation.";
+        let num_tokens = 15;
+
+        run_generation_test(
+            &generator,
+            input,
+            num_tokens,
+            GenerateConfig::new(),
+            true,
+            true,
+            &SamplingMethod::Sampling,
+        );
+    }
+
+    #[test]
+    fn test_top_k_and_top_p_argmax() {
+        let config = Config::new();
+        let generator = TextGenerator::new(config).unwrap();
+        let input = "Test input for generation.";
+        let num_tokens = 15;
+
+        run_generation_test(
+            &generator,
+            input,
+            num_tokens,
+            GenerateConfig::new(),
+            true,
+            true,
+            &SamplingMethod::Argmax,
+        );
+    }
+
+    #[test]
+    fn test_no_filtering_sampling() {
+        let config = Config::new();
+        let generator = TextGenerator::new(config).unwrap();
+        let input = "Test input for generation.";
+        let num_tokens = 15;
+
+        run_generation_test(
+            &generator,
+            input,
+            num_tokens,
+            GenerateConfig::new(),
+            false,
+            false,
+            &SamplingMethod::Sampling,
+        );
+    }
+
+    #[test]
+    fn test_no_filtering_argmax() {
+        let config = Config::new();
+        let generator = TextGenerator::new(config).unwrap();
+        let input = "Test input for generation.";
+        let num_tokens = 15;
+
+        run_generation_test(
+            &generator,
+            input,
+            num_tokens,
+            GenerateConfig::new(),
+            false,
+            false,
+            &SamplingMethod::Argmax,
+        );
+    }
+}
