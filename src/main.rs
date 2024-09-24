@@ -27,6 +27,40 @@ impl Config {
     }
 }
 
+// Define a struct to hold optional parameters with default values
+struct GenerateConfig {
+    temperature: f32,
+    top_k: usize,
+    top_p: f32,
+}
+
+impl GenerateConfig {
+    // Method to create a new config with default values
+    fn new() -> Self {
+        Self {
+            temperature: 0.7,
+            top_k: 50,
+            top_p: 0.9,
+        }
+    }
+
+    // Builder methods to set individual parameters
+    fn temperature(mut self, value: f32) -> Self {
+        self.temperature = value;
+        self
+    }
+
+    fn top_k(mut self, value: usize) -> Self {
+        self.top_k = value;
+        self
+    }
+
+    fn top_p(mut self, value: f32) -> Self {
+        self.top_p = value;
+        self
+    }
+}
+
 struct TextGenerator {
     model: SimplePlan<TypedFact, Box<dyn TypedOp>, Graph<TypedFact, Box<dyn TypedOp>>>,
     tokenizer: Gpt2Tokenizer,
@@ -58,7 +92,7 @@ impl TextGenerator {
         })
     }
 
-    fn generate(&self, input: &str, num_tokens: usize) -> Result<String> {
+    fn generate(&self, input: &str, num_tokens: usize, config: GenerateConfig) -> Result<String> {
         let (mut input_ids, mut attention_mask) = self.get_input_ids(input)?;
         let mut generated_tokens = input_ids.clone();
         let mut past_key_values_tensor = create_empty_past_key_values(24, 1, 12, 0, 64)?;
@@ -78,13 +112,10 @@ impl TextGenerator {
             let logits = outputs[0].to_array_view::<f32>()?.to_owned();
             past_key_values_tensor = outputs[1].clone().into_tensor();
 
-            // Apply top-k and top-p filtering
-            let k_filtered_logits = top_k_filtering(&logits, 50);
-            let p_filtered_logits = top_p_filtering(&k_filtered_logits, 0.9);
+            let k_filtered_logits = top_k_filtering(&logits, config.top_k);
+            let p_filtered_logits = top_p_filtering(&k_filtered_logits, config.top_p);
 
-            // Use argmax to get the next token ID
-            // let next_token_id = argmax(&p_filtered_logits);
-            let next_token_id = sample_from_logits(&p_filtered_logits, 1.0);
+            let next_token_id = sample_from_logits(&p_filtered_logits, config.temperature);
             if self.stop_token_id.contains(&next_token_id) {
                 break;
             }
@@ -225,7 +256,7 @@ fn main() -> Result<()> {
     let generator = TextGenerator::new(config)?;
 
     let input = "Machine learning is great for humanity. It helps";
-    let generated_text = generator.generate(input, 100)?;
+    let generated_text = generator.generate(input, 100, GenerateConfig::new())?;
 
     println!("Final generated text: {}", generated_text);
     Ok(())
