@@ -11,6 +11,7 @@ struct Config {
     tokenizer_vocab_path: String,
     tokenizer_merges_path: String,
     tokenizer_special_tokens_path: String,
+    stop_token: String,
 }
 
 impl Config {
@@ -21,6 +22,7 @@ impl Config {
             tokenizer_vocab_path: "tokenizer/vocab.json".to_string(),
             tokenizer_merges_path: "tokenizer/merges.txt".to_string(),
             tokenizer_special_tokens_path: "tokenizer/special_tokens_map.json".to_string(),
+            stop_token: "<|endoftext|>".to_string(),
         }
     }
 }
@@ -29,6 +31,7 @@ struct TextGenerator {
     model: SimplePlan<TypedFact, Box<dyn TypedOp>, Graph<TypedFact, Box<dyn TypedOp>>>,
     tokenizer: Gpt2Tokenizer,
     config: Config,
+    stop_token_id: Vec<i64>,
 }
 
 impl TextGenerator {
@@ -45,10 +48,13 @@ impl TextGenerator {
             &config.tokenizer_special_tokens_path,
         )?;
 
+        let stop_token_id = tokenizer.convert_tokens_to_ids(&[&config.stop_token]);
+
         Ok(Self {
             model,
             tokenizer,
             config,
+            stop_token_id,
         })
     }
 
@@ -79,6 +85,9 @@ impl TextGenerator {
             // Use argmax to get the next token ID
             // let next_token_id = argmax(&p_filtered_logits);
             let next_token_id = sample_from_logits(&p_filtered_logits);
+            if self.stop_token_id.contains(&next_token_id) {
+                break;
+            }
 
             generated_tokens.push(next_token_id);
             let output = self.tokenizer.decode(&generated_tokens, false, true);
