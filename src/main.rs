@@ -11,7 +11,6 @@ struct Config {
     tokenizer_vocab_path: String,
     tokenizer_merges_path: String,
     tokenizer_special_tokens_path: String,
-    stop_token: String,
 }
 
 impl Config {
@@ -22,12 +21,12 @@ impl Config {
             tokenizer_vocab_path: "tokenizer/vocab.json".to_string(),
             tokenizer_merges_path: "tokenizer/merges.txt".to_string(),
             tokenizer_special_tokens_path: "tokenizer/special_tokens_map.json".to_string(),
-            stop_token: "<|endoftext|>".to_string(),
         }
     }
 }
 
 // Define a struct to hold optional parameters with default values
+#[derive(Clone)] // Add this line
 struct GenerateConfig {
     temperature: f32,
     top_k: usize,
@@ -38,7 +37,7 @@ impl GenerateConfig {
     // Method to create a new config with default values
     fn new() -> Self {
         Self {
-            temperature: 0.7,
+            temperature: 0.5,
             top_k: 50,
             top_p: 0.9,
         }
@@ -60,12 +59,17 @@ impl GenerateConfig {
         self
     }
 }
+#[derive(Debug, Clone)] // Add this line
+enum SamplingMethod {
+    Sampling,
+    Argmax,
+}
 
 struct TextGenerator {
     model: SimplePlan<TypedFact, Box<dyn TypedOp>, Graph<TypedFact, Box<dyn TypedOp>>>,
     tokenizer: Gpt2Tokenizer,
     config: Config,
-    stop_token_id: Vec<i64>,
+    stop_tokens: Vec<String>,
 }
 
 impl TextGenerator {
@@ -82,22 +86,30 @@ impl TextGenerator {
             &config.tokenizer_special_tokens_path,
         )?;
 
-        let stop_token_id = tokenizer.convert_tokens_to_ids(&[&config.stop_token]);
+        let stop_tokens = vec!["<|endoftext|>".to_string(), "Question".to_string()];
 
         Ok(Self {
             model,
             tokenizer,
             config,
-            stop_token_id,
+            stop_tokens,
         })
     }
 
-    fn generate(&self, input: &str, num_tokens: usize, config: GenerateConfig) -> Result<String> {
+    fn generate(
+        &self,
+        input: &str,
+        num_tokens: usize,
+        config: GenerateConfig,
+        use_top_k: bool,
+        use_top_p: bool,
+        sampling_method: SamplingMethod,
+    ) -> Result<String> {
         let (mut input_ids, mut attention_mask) = self.get_input_ids(input)?;
         let mut generated_tokens = input_ids.clone();
         let mut past_key_values_tensor = create_empty_past_key_values(24, 1, 12, 0, 64)?;
 
-        for _ in 0..num_tokens {
+        for i in 0..num_tokens {
             let input_ids_tensor = create_tensor(&input_ids)?;
             let attention_mask_tensor = create_tensor(&attention_mask)?;
 
@@ -112,22 +124,37 @@ impl TextGenerator {
             let logits = outputs[0].to_array_view::<f32>()?.to_owned();
             past_key_values_tensor = outputs[1].clone().into_tensor();
 
-            let k_filtered_logits = top_k_filtering(&logits, config.top_k);
-            let p_filtered_logits = top_p_filtering(&k_filtered_logits, config.top_p);
+            let mut filtered_logits = if use_top_k {
+                top_k_filtering(&logits, config.top_k)
+            } else {
+                logits.clone() // No filtering
+            };
+            filtered_logits = if use_top_p {
+                top_p_filtering(&filtered_logits, config.top_p)
+            } else {
+                filtered_logits // No filtering
+            };
 
-            let next_token_id = sample_from_logits(&p_filtered_logits, config.temperature);
-            if self.stop_token_id.contains(&next_token_id) {
-                break;
-            }
+            let next_token_id = match sampling_method {
+                SamplingMethod::Sampling => {
+                    sample_from_logits(&filtered_logits, config.temperature)
+                }
+                SamplingMethod::Argmax => argmax(&filtered_logits),
+            };
+            // Debugging output
 
             generated_tokens.push(next_token_id);
             let output = self.tokenizer.decode(&generated_tokens, false, true);
-            println!("{}", output);
+            if self.stop_tokens.contains(&output) {
+                println!("Stopping generation due to stop token.");
+                break;
+            }
+            println!("Output: {}", output);
             input_ids = vec![next_token_id];
             attention_mask.push(1);
         }
 
-        Ok(self.tokenizer.decode(&generated_tokens, true, true))
+        Ok(self.tokenizer.decode(&generated_tokens, false, true))
     }
 
     fn get_input_ids(&self, text: &str) -> Result<(Vec<i64>, Vec<i8>)> {
@@ -255,8 +282,15 @@ fn main() -> Result<()> {
     let config = Config::new();
     let generator = TextGenerator::new(config)?;
 
-    let input = "Machine learning is great for humanity. It helps";
-    let generated_text = generator.generate(input, 100, GenerateConfig::new())?;
+    let input = "Read the question and give an honest answer. Question: What is Artificial Intelligence? Answer:";
+    let generated_text = generator.generate(
+        input,
+        100,
+        GenerateConfig::new(),
+        true,
+        true,
+        SamplingMethod::Sampling,
+    )?;
 
     println!("Final generated text: {}", generated_text);
     Ok(())
