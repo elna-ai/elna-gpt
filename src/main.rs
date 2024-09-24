@@ -1,5 +1,6 @@
 use anyhow::Result;
 use ndarray_npy::read_npy;
+use rand::distributions::WeightedIndex;
 use rust_tokenizers::tokenizer::{Gpt2Tokenizer, Tokenizer, TruncationStrategy};
 use tract_ndarray::{s, ArrayD, ArrayViewD, IxDyn};
 use tract_onnx::prelude::Datum;
@@ -76,7 +77,8 @@ impl TextGenerator {
             let p_filtered_logits = top_p_filtering(&k_filtered_logits, 0.9);
 
             // Use argmax to get the next token ID
-            let next_token_id = argmax(&p_filtered_logits);
+            // let next_token_id = argmax(&p_filtered_logits);
+            let next_token_id = sample_from_logits(&p_filtered_logits);
 
             generated_tokens.push(next_token_id);
             let output = self.tokenizer.decode(&generated_tokens, false, true);
@@ -104,7 +106,7 @@ impl TextGenerator {
     }
 }
 
-fn softmax(logits: &mut ArrayViewD<f32>) -> ArrayD<f32> {
+fn softmax(logits: &ArrayViewD<f32>) -> ArrayD<f32> {
     let max = logits.fold(f32::NEG_INFINITY, |a, &b| a.max(b));
     let exp: ArrayD<f32> = logits.mapv(|x| (x - max).exp());
     let sum = exp.sum();
@@ -180,6 +182,32 @@ fn argmax(logits: &ArrayD<f32>) -> i64 {
         .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
         .map(|(index, _)| index as i64)
         .unwrap()
+}
+
+fn sample_from_logits(logits: &ArrayD<f32>) -> i64 {
+    let probabilities = softmax(&logits.view());
+
+    // Flatten the probabilities array to a 1D vector for sampling
+    let mut prob_vec: Vec<f32> = probabilities.iter().cloned().collect();
+
+    // Ensure all probabilities are valid (non-negative and not NaN)
+    prob_vec.iter_mut().for_each(|p| {
+        if !p.is_finite() || *p < 0.0 {
+            *p = 0.0;
+        }
+    });
+
+    // If all probabilities are zero, return a random index
+    if prob_vec.iter().all(|&p| p == 0.0) {
+        return rand::Rng::gen_range(&mut rand::thread_rng(), 0..prob_vec.len()) as i64;
+    }
+
+    // Create a weighted index distribution based on the probabilities
+    let dist = WeightedIndex::new(&prob_vec).expect("Probabilities should be valid");
+
+    // Randomly select an index based on the weighted probabilities
+    let mut rng = rand::thread_rng();
+    rand::prelude::Distribution::sample(&dist, &mut rng) as i64
 }
 
 fn main() -> Result<()> {
