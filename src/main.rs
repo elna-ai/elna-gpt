@@ -84,7 +84,7 @@ impl TextGenerator {
 
             // Use argmax to get the next token ID
             // let next_token_id = argmax(&p_filtered_logits);
-            let next_token_id = sample_from_logits(&p_filtered_logits);
+            let next_token_id = sample_from_logits(&p_filtered_logits, 1.0);
             if self.stop_token_id.contains(&next_token_id) {
                 break;
             }
@@ -193,8 +193,9 @@ fn argmax(logits: &ArrayD<f32>) -> i64 {
         .unwrap()
 }
 
-fn sample_from_logits(logits: &ArrayD<f32>) -> i64 {
-    let probabilities = softmax(&logits.view());
+fn sample_from_logits(logits: &ArrayD<f32>, temperature: f32) -> i64 {
+    let adjusted_logits = logits.mapv(|x| x / temperature);
+    let probabilities = softmax(&adjusted_logits.view());
 
     // Flatten the probabilities array to a 1D vector for sampling
     let mut prob_vec: Vec<f32> = probabilities.iter().cloned().collect();
