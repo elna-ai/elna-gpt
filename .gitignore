@@ -1,5 +1,7 @@
-gpt2-inference/target/
 models/
 tokenizer/
 .venv/
-build.sh/
+build.sh
+**/target/
+**/.env
+**/.dfx
