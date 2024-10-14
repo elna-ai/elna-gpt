@@ -1,0 +1,5 @@
+[workspace]
+members = [
+    "src/ic-llama3-backend"
+]
+resolver = "2"
