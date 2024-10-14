@@ -2,7 +2,7 @@ use half::f16;
 use std::cell::RefCell;
 use std::time::Instant;
 use tokenizers::tokenizer::{Result as TokenizerResult, Tokenizer};
-use tract_ndarray::{ArrayD, ArrayViewD, IxDyn};
+use tract_ndarray::{ArrayD, IxDyn};
 use tract_onnx::prelude::*;
 
 const TARGET_LEN: usize = 256;
