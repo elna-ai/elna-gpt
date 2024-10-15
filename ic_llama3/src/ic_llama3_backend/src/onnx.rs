@@ -26,23 +26,6 @@ pub fn setup_model(bytes: Bytes) -> TractResult<()> {
     });
     Ok(())
 }
-// Function to initialize and return the model for the current thread
-// fn get_model() -> SimplePlan<TypedFact, Box<dyn TypedOp>, Graph<TypedFact, Box<dyn TypedOp>>> {
-//     MODEL.with(|model| {
-//         let mut model_ref = model.borrow_mut();
-//         if model_ref.is_none() {
-//             let new_model = tract_onnx::onnx()
-//                 .model_for_path("models/fp16/llama3.2_1b.onnx")
-//                 .unwrap()
-//                 .into_optimized()
-//                 .unwrap()
-//                 .into_runnable()
-//                 .unwrap();
-//             *model_ref = Some(new_model);
-//         }
-//         model_ref.as_mut().unwrap().clone() // Clone the model and return it
-//     })
-// }
 
 // Function to initialize and return the tokenizer for the current thread
 pub fn setup_tokenizer(bytes: Bytes) -> Result<Tokenizer, ()> {
@@ -64,55 +47,81 @@ fn get_input_ids(tokenizer: &Tokenizer, text: &str) -> (Vec<i64>, Vec<i8>) {
     (input_ids, attention_mask)
 }
 
-// fn main() -> TractResult<()> {
-//     // Access the thread-local model and tokenizer
-//     let mut model = get_model();
-//     let tokenizer = get_tokenizer();
+fn inference(input: &str) -> TractResult<()> {
+    // Setup model and tokenizer
+    MODEL.with(|model_cell| -> TractResult<()> {
+        let model_opt = model_cell.borrow();
+        let model = model_opt
+            .as_ref()
+            .ok_or(anyhow::anyhow!("Model not initialized"))?;
 
-//     let mut past_key_values_tensor = create_empty_past_key_values(32, 1, 8, 0, 64)?;
+        TOKENIZER.with(|tokenizer_cell| -> TractResult<()> {
+            let tokenizer_opt = tokenizer_cell.borrow();
+            let tokenizer = tokenizer_opt
+                .as_ref()
+                .ok_or(anyhow::anyhow!("Tokenizer not initialized"))?;
 
-//     let input = "<|begin_of_text|>Context: The Internet Computer is a public blockchain network enabled by new science from first principles. It is millions of times more powerful and can replace clouds and traditional IT.<|eot_id|>
-//  <|begin_of_text|>What is internet computer? generate in one sentance <|eot_id|> <|begin_of_text|>Answer:";
-//     let (mut input_ids, mut attention_mask) = get_input_ids(&tokenizer, input);
-//     let mut generated_tokens: Vec<i64> = vec![];
+            // Tokenize the input
+            let (mut input_ids, mut attention_mask) = get_input_ids(&tokenizer, input);
+            let mut generated_tokens: Vec<i64> = vec![];
 
-//     for j in 0..5 {
-//         let input_ids_tensor = create_tensor_i64(&input_ids)?;
-//         let attention_mask_tensor = create_tensor_i8(&attention_mask)?;
+            // Create empty past key values tensor
+            let mut past_key_values_tensor = create_empty_past_key_values(32, 1, 8, 0, 64)?;
 
-//         let inputs: TVec<TValue> = tvec!(
-//             input_ids_tensor.into(),
-//             attention_mask_tensor.into(),
-//             past_key_values_tensor.clone().into()
-//         );
+            // Generate tokens for a fixed number of steps or until stopping token
+            for _ in 0..TARGET_LEN {
+                // Convert input IDs and attention mask to tensors
+                let input_ids_tensor = create_tensor_i64(&input_ids)?;
+                let attention_mask_tensor = create_tensor_i8(&attention_mask)?;
 
-//         let outputs = match model.run(inputs) {
-//             Ok(o) => o,
-//             Err(e) => {
-//                 println!("Model run failed: {:?}", e);
-//                 return Err(e);
-//             }
-//         };
+                // Prepare inputs for the model
+                let inputs: TVec<TValue> = tvec!(
+                    input_ids_tensor.into(),
+                    attention_mask_tensor.into(),
+                    past_key_values_tensor.clone().into()
+                );
 
-//         past_key_values_tensor = outputs[1].clone().into_tensor();
-//         let next_token_tensor = outputs[0].to_array_view::<i64>()?;
-//         let next_token = next_token_tensor[[0, 0]];
-//         if next_token == 50258 {
-//             break;
-//         }
-//         println!("Next token: {}", next_token);
-//         generated_tokens.push(next_token);
+                // Run the model
+                let outputs = match model.run(inputs) {
+                    Ok(o) => o,
+                    Err(e) => {
+                        eprintln!("Model run failed: {:?}", e);
+                        return Err(e);
+                    }
+                };
 
-//         input_ids = vec![next_token];
-//         attention_mask.push(1);
-//     }
+                // Extract outputs: next token and updated past key values
+                past_key_values_tensor = outputs[1].clone().into_tensor();
+                let next_token_tensor = outputs[0].to_array_view::<i64>()?;
+                let next_token = next_token_tensor[[0, 0]];
 
-//     let generated_tokens_u32: Vec<u32> = generated_tokens.iter().map(|&x| x as u32).collect();
-//     let final_output = tokenizer.decode(&generated_tokens_u32, false).unwrap();
-//     println!("{}", final_output);
+                // Stop if the token is the stopping token (50258 here)
+                if next_token == 50258 {
+                    break;
+                }
 
-//     Ok(())
-// }
+                println!("Next token: {}", next_token);
+                generated_tokens.push(next_token);
+
+                // Prepare for the next iteration
+                input_ids = vec![next_token];
+                attention_mask.push(1);
+            }
+
+            // Convert generated tokens back to text
+            let generated_tokens_u32: Vec<u32> =
+                generated_tokens.iter().map(|&x| x as u32).collect();
+            let final_output = tokenizer.decode(&generated_tokens_u32, false).unwrap();
+            println!("{}", final_output);
+
+            Ok(())
+        })?;
+
+        Ok(())
+    })?;
+
+    Ok(())
+}
 
 // Function to create tensors
 fn create_tensor_i64(data: &[i64]) -> TractResult<Tensor> {
