@@ -3,28 +3,14 @@
     "ic_llama3_backend": {
       "candid": "src/ic_llama3_backend/ic_llama3_backend.did",
       "package": "ic_llama3_backend",
-      "type": "rust"
-    },
-    "internet_identity": {
-      "candid": "https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity.did",
-      "frontend": {},
-      "remote": {
-        "id": {
-          "ic": "rdmx6-jaaaa-aaaaa-aaadq-cai"
-        }
-      },
       "type": "custom",
-      "wasm": "https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_dev.wasm.gz"
+      "wasm": "target/wasm32-wasi/release/ic_llama3_backend.wasm",
+      "build": [
+        "bash scripts/build.sh"
+      ]
     }
   },
   "defaults": {
-    "bitcoin": {
-      "enabled": true,
-      "log_level": "info",
-      "nodes": [
-        "127.0.0.1:18444"
-      ]
-    },
     "build": {
       "args": "",
       "packtool": ""
