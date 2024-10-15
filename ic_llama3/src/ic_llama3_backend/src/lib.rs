@@ -4,10 +4,12 @@ use ic_stable_structures::{
     memory_manager::{MemoryId, MemoryManager},
     DefaultMemoryImpl,
 };
+use onnx::{setup_model, setup_tokenizer};
 use std::cell::RefCell;
 
 const WASI_MEMORY_ID: MemoryId = MemoryId::new(0);
 const MODEL_FILE: &str = "model.onnx";
+const TOKENIZER_FILE: &str = "tokenizer.json";
 
 thread_local! {
     // The memory manager is used for simulating multiple memories.
@@ -36,4 +38,10 @@ fn append_model_bytes(bytes: Vec<u8>) {
     storage::append_bytes(MODEL_FILE, bytes);
 }
 
+#[ic_cdk::update]
+fn setup() -> Result<(), String> {
+    setup_tokenizer(storage::bytes(TOKENIZER_FILE))
+        .map_err(|err| format!("Failed to setup model: {:?}", err))?;
+    setup_model(storage::bytes(MODEL_FILE)).map_err(|err| format!("Failed to setup model: {}", err))
+}
 ic_cdk::export_candid!();
