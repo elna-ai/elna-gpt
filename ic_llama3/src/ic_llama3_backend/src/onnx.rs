@@ -47,15 +47,16 @@ fn get_input_ids(tokenizer: &Tokenizer, text: &str) -> (Vec<i64>, Vec<i8>) {
     (input_ids, attention_mask)
 }
 
-fn inference(input: &str) -> TractResult<()> {
+pub fn inference(input: &str) -> TractResult<String> {
     // Setup model and tokenizer
-    MODEL.with(|model_cell| -> TractResult<()> {
+    MODEL.with(|model_cell| {
         let model_opt = model_cell.borrow();
         let model = model_opt
             .as_ref()
             .ok_or(anyhow::anyhow!("Model not initialized"))?;
 
-        TOKENIZER.with(|tokenizer_cell| -> TractResult<()> {
+        // Ensure TOKENIZER.with closure returns a proper Result
+        TOKENIZER.with(|tokenizer_cell| -> TractResult<String> {
             let tokenizer_opt = tokenizer_cell.borrow();
             let tokenizer = tokenizer_opt
                 .as_ref()
@@ -69,7 +70,7 @@ fn inference(input: &str) -> TractResult<()> {
             let mut past_key_values_tensor = create_empty_past_key_values(32, 1, 8, 0, 64)?;
 
             // Generate tokens for a fixed number of steps or until stopping token
-            for _ in 0..TARGET_LEN {
+            for _ in 0..5 {
                 // Convert input IDs and attention mask to tensors
                 let input_ids_tensor = create_tensor_i64(&input_ids)?;
                 let attention_mask_tensor = create_tensor_i8(&attention_mask)?;
@@ -100,7 +101,6 @@ fn inference(input: &str) -> TractResult<()> {
                     break;
                 }
 
-                println!("Next token: {}", next_token);
                 generated_tokens.push(next_token);
 
                 // Prepare for the next iteration
@@ -112,15 +112,11 @@ fn inference(input: &str) -> TractResult<()> {
             let generated_tokens_u32: Vec<u32> =
                 generated_tokens.iter().map(|&x| x as u32).collect();
             let final_output = tokenizer.decode(&generated_tokens_u32, false).unwrap();
-            println!("{}", final_output);
 
-            Ok(())
-        })?;
-
-        Ok(())
-    })?;
-
-    Ok(())
+            // Return the final generated text
+            Ok(final_output)
+        })
+    })
 }
 
 // Function to create tensors

@@ -17,6 +17,13 @@ thread_local! {
         RefCell::new(MemoryManager::init(DefaultMemoryImpl::default()));
 }
 
+#[target_feature(enable = "simd128")]
+#[ic_cdk::update]
+fn inference_engine(text: String) -> String {
+    let generated_text = onnx::inference(&text).unwrap();
+    generated_text
+}
+
 #[ic_cdk::init]
 fn init() {
     // Initialize ic_wasi_polyfill with a memory manager.
