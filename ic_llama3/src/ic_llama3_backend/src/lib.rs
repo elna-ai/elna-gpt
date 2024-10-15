@@ -1,5 +1,5 @@
+mod onnx;
 mod storage;
-
 use ic_stable_structures::{
     memory_manager::{MemoryId, MemoryManager},
     DefaultMemoryImpl,

@@ -23,4 +23,6 @@ half = "2.4.1"
 bytes = "1.5.0"
 ic-wasi-polyfill = "0.3.17"
 ic-stable-structures = "0.6"
+prost = "0.11.0"
+
 

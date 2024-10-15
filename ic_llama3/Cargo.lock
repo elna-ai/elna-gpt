@@ -1095,6 +1095,7 @@ dependencies = [
  "ic-wasi-polyfill",
  "ndarray",
  "ndarray-npy",
+ "prost",
  "rand",
  "tokenizers",
  "tract-onnx",
