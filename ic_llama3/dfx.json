@@ -1,8 +1,8 @@
 {
   "canisters": {
-    "ic-llama3-backend": {
-      "candid": "src/ic-llama3-backend/ic-llama3-backend.did",
-      "package": "ic-llama3-backend",
+    "ic_llama3_backend": {
+      "candid": "src/ic_llama3_backend/ic_llama3_backend.did",
+      "package": "ic_llama3_backend",
       "type": "rust"
     },
     "internet_identity": {

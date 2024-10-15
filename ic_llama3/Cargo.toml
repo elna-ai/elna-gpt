@@ -1,5 +1,5 @@
 [workspace]
 members = [
-    "src/ic-llama3-backend"
+    "src/ic_llama3_backend"
 ]
 resolver = "2"

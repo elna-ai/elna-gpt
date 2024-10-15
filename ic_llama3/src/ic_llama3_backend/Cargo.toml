@@ -1,5 +1,5 @@
 [package]
-name = "ic-llama3-backend"
+name = "ic_llama3_backend"
 version = "0.1.0"
 edition = "2021"
 
@@ -10,7 +10,8 @@ crate-type = ["cdylib"]
 
 [dependencies]
 candid = "0.10"
-ic-cdk = "0.13"
+ic-cdk = "0.12"
+candid-extractor = "0.1.4"
 ic-cdk-timers = "0.7" # Feel free to remove this dependency if you don't need timers
 tract-onnx = { git = "https://github.com/sonos/tract", rev = "2a2914ac29390cc08963301c9f3d437b52dd321a" }
 anyhow = "1.0"
