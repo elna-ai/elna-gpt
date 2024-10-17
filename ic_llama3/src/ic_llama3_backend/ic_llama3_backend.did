@@ -1,1 +1,7 @@
-service : { append_vocab_bytes : (blob) -> () }
+type Result = variant { Ok : vec nat32; Err : text };
+type Result_1 = variant { Ok; Err : text };
+service : () -> {
+  append_model_bytes : (blob) -> ();
+  model_inference : (vec int64) -> (Result);
+  setup : () -> (Result_1);
+}

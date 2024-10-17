@@ -8,6 +8,15 @@
       "build": [
         "bash scripts/build.sh"
       ]
+    },
+    "llama3_tokenizer_backend": {
+      "candid": "src/llama3_tokenizer_backend/llama3_tokenizer_backend.did",
+      "package": "llama3_tokenizer_backend",
+      "type": "custom",
+      "wasm": "target/wasm32-wasi/release/llama3_tokenizer_backend.wasm",
+      "build": [
+        "bash scripts/buildtok.sh"
+      ]
     }
   },
   "defaults": {
