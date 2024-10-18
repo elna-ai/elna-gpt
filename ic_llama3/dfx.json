@@ -10,6 +10,11 @@
       ]
     },
     "llama3_tokenizer_backend": {
+      "metadata": [
+        {
+          "name": "candid:service"
+        }
+      ],
       "candid": "src/llama3_tokenizer_backend/llama3_tokenizer_backend.did",
       "package": "llama3_tokenizer_backend",
       "type": "custom",
