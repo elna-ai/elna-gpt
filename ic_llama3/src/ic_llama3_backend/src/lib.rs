@@ -67,6 +67,10 @@ fn post_upgrade() {
     ic_wasi_polyfill::init_with_memory(&[0u8; 32], &[], wasi_memory);
 }
 
+#[ic_cdk::update]
+fn clear_model_bytes() {
+    storage::clear_bytes(MODEL_FILE1);
+}
 // Appends the given chunk to the model file.
 // This is used for incremental chunk uploading of large files.
 #[ic_cdk::update]

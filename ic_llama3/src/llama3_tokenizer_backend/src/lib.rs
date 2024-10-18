@@ -7,7 +7,7 @@ use ic_stable_structures::{
     DefaultMemoryImpl,
 };
 use std::cell::RefCell;
-use tokenizer::{append_bytes, bytes, decode_output, encode_input, setup_tokenizer};
+use tokenizer::{append_bytes, bytes, clear_bytes, decode_output, encode_input, setup_tokenizer};
 
 const WASI_MEMORY_ID: MemoryId = MemoryId::new(0);
 
@@ -29,6 +29,11 @@ fn post_upgrade() {
     // Reinitialize ic_wasi_polyfill after canister upgrade.
     let wasi_memory = MEMORY_MANAGER.with(|m| m.borrow().get(WASI_MEMORY_ID));
     ic_wasi_polyfill::init_with_memory(&[0u8; 32], &[], wasi_memory);
+}
+
+#[ic_cdk::update]
+fn clear_tokenizer_bytes() {
+    clear_bytes(TOKENIZER_FILE);
 }
 
 #[ic_cdk::update]

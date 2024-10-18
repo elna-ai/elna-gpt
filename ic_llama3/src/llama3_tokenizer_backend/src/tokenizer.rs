@@ -20,6 +20,11 @@ pub fn append_bytes(filename: &str, bytes: Vec<u8>) {
     file.write_all(&bytes).unwrap();
 }
 
+pub fn clear_bytes(filename: &str) {
+    // Don't fail if the file doesn't exist.
+    let _ = std::fs::remove_file(filename);
+}
+
 pub fn decode_output(output_ids: Vec<u32>) -> Result<String, String> {
     TOKENIZER.with(|tokenizer_ref| {
         let tokenizer = tokenizer_ref.borrow();
