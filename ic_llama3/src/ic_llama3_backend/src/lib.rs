@@ -1,5 +1,5 @@
 mod onnx;
-mod storage;
+pub mod storage;
 use ic_stable_structures::{
     memory_manager::{MemoryId, MemoryManager},
     DefaultMemoryImpl,
@@ -25,7 +25,7 @@ thread_local! {
 // }
 #[target_feature(enable = "simd128")]
 #[ic_cdk::update]
-fn model_inference(token_ids: Vec<i64>) -> Result<Vec<u32>, String> {
+pub fn model_inference(token_ids: Vec<i64>) -> Result<Vec<u32>, String> {
     onnx::run(token_ids).map_err(|err| err.to_string())
 }
 

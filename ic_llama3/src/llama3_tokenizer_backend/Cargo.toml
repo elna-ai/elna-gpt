@@ -15,4 +15,4 @@ bytes = "1.5.0"
 ic-stable-structures = "0.6"
 ic-wasi-polyfill = "0.5"
 tokenizers = { version = "0.19.1", default-features = false, features = ["unstable_wasm"] }
-
+# ic_llama3_backend= { path= "../ic_llama3_backend"}
