@@ -130,7 +130,7 @@ fn create_empty_past_key_values(
     let shape = [num_layers, batch_size, num_heads, seq_length, head_dim];
     let array = tract_ndarray::Array::from_shape_vec(
         IxDyn(&shape),
-        vec![f16::ZERO; num_layers * batch_size * num_heads * seq_length * head_dim],
+        vec![0_i8; num_layers * batch_size * num_heads * seq_length * head_dim],
     )
     .map_err(|_| anyhow::anyhow!("Failed to create tensor from shape and values"))?;
     Ok(array.into_tensor())

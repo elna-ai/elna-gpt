@@ -13,8 +13,8 @@ use std::cell::RefCell;
 use tokenizer::{decode, encode};
 
 const WASI_MEMORY_ID: MemoryId = MemoryId::new(0);
-const MODEL_FILE: &str = "model.onnx";
-// const TOKENIZER_FILE: &str = "tokenizer.json";
+const MODEL_FILE1: &str = "model.onnx";
+const MODEL_FILE2: &str = "9975db42-89df-11ef-b330-0242ac1c000c";
 
 thread_local! {
 
@@ -25,12 +25,6 @@ thread_local! {
         RefCell::new(MemoryManager::init(DefaultMemoryImpl::default()));
 }
 
-// #[target_feature(enable = "simd128")]
-// #[ic_cdk::update]
-// fn inference_engine(text: String) -> String {
-//     let generated_text = onnx::inference(&text).unwrap();
-//     generated_text
-// }
 #[target_feature(enable = "simd128")]
 #[ic_cdk::update]
 async fn model_inference(text: String) -> Result<String, (RejectionCode, std::string::String)> {
@@ -49,6 +43,12 @@ async fn model_inference(text: String) -> Result<String, (RejectionCode, std::st
 
         Err(rejection) => Err(rejection),
     }
+}
+
+#[target_feature(enable = "simd128")]
+#[ic_cdk::update]
+fn test_model(token_ids: Vec<i64>) -> Vec<u32> {
+    onnx::run(token_ids).unwrap()
 }
 
 #[ic_cdk::init]
@@ -71,13 +71,17 @@ fn post_upgrade() {
 // This is used for incremental chunk uploading of large files.
 #[ic_cdk::update]
 fn append_model_bytes(bytes: Vec<u8>) {
-    storage::append_bytes(MODEL_FILE, bytes);
+    storage::append_bytes(MODEL_FILE1, bytes);
+}
+
+#[ic_cdk::update]
+fn append_weights_bytes(bytes: Vec<u8>) {
+    storage::append_bytes(MODEL_FILE2, bytes);
 }
 
 #[ic_cdk::update]
 fn setup() -> Result<(), String> {
-    // setup_tokenizer(storage::bytes(TOKENIZER_FILE))
-    //     .map_err(|err| format!("Failed to setup model: {:?}", err))?;
-    setup_model(storage::bytes(MODEL_FILE)).map_err(|err| format!("Failed to setup model: {}", err))
+    setup_model(storage::bytes(MODEL_FILE1))
+        .map_err(|err| format!("Failed to setup model: {}", err))
 }
 ic_cdk::export_candid!();

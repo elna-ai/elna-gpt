@@ -1,7 +1,18 @@
-type Result = variant { Ok : vec nat32; Err : text };
+type RejectionCode = variant {
+  NoError;
+  CanisterError;
+  SysTransient;
+  DestinationInvalid;
+  Unknown;
+  SysFatal;
+  CanisterReject;
+};
+type Result = variant { Ok : text; Err : record { RejectionCode; text } };
 type Result_1 = variant { Ok; Err : text };
-service : () -> {
+service : (principal) -> {
   append_model_bytes : (blob) -> ();
-  model_inference : (vec int64) -> (Result);
+  append_weights_bytes : (blob) -> ();
+  model_inference : (text) -> (Result);
   setup : () -> (Result_1);
+  test_model : (vec int64) -> (vec nat32);
 }
