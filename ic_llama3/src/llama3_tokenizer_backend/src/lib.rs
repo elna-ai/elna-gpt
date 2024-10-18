@@ -1,21 +1,19 @@
 // extern crate ic_llama3_backend;
 // use ic_llama3_backend::storage;
 // use super::ic_llama3_backend;
-use bytes::Bytes;
+mod tokenizer;
 use ic_stable_structures::{
     memory_manager::{MemoryId, MemoryManager},
     DefaultMemoryImpl,
 };
 use std::cell::RefCell;
-use std::io::Write;
-use tokenizers::tokenizer::Tokenizer;
+use tokenizer::{append_bytes, bytes, decode_output, encode_input, setup_tokenizer};
 
 const WASI_MEMORY_ID: MemoryId = MemoryId::new(0);
 
 thread_local! {
 static MEMORY_MANAGER: RefCell<MemoryManager<DefaultMemoryImpl>> =
     RefCell::new(MemoryManager::init(DefaultMemoryImpl::default()));
-static TOKENIZER: RefCell<Option<Tokenizer>> = RefCell::new(None);
 }
 const TOKENIZER_FILE: &str = "tokenizer.json";
 
@@ -46,56 +44,16 @@ fn setup() -> Result<(), String> {
         .map_err(|err| format!("Failed to setup model: {:?}", err))
 }
 
-pub fn setup_tokenizer(bytes: Bytes) -> Result<(), ()> {
-    let tokenizer_from_bytes = Tokenizer::from_bytes(&bytes.to_vec()).map_err(|_| ())?; // Handle the error and propagate it
-
-    TOKENIZER.with_borrow_mut(|tokenizer_ref| {
-        *tokenizer_ref = Some(tokenizer_from_bytes);
-    });
-
-    Ok(()) // Return Ok(()) after saving the tokenizer
-}
-
-#[ic_cdk::update]
-pub fn get_token_ids(text: String) -> Result<Vec<i64>, String> {
-    TOKENIZER.with(|tokenizer_ref| {
-        let tokenizer = tokenizer_ref.borrow();
-        if let Some(tokenizer) = tokenizer.as_ref() {
-            let encoding = tokenizer
-                .encode(text, false)
-                .map_err(|e| format!("Encoding error: {:?}", e))?;
-            let token_ids: Vec<i64> = encoding.get_ids().iter().map(|&id| id as i64).collect();
-            Ok(token_ids)
-        } else {
-            Err("Tokenizer not initialized".to_string())
-        }
-    })
+#[ic_cdk::query]
+fn get_token_ids(text: String) -> Result<Vec<i64>, String> {
+    let token_ids = encode_input(text);
+    token_ids
 }
 
 #[ic_cdk::query]
-pub fn decode_output(output_ids: Vec<u32>) -> Result<String, String> {
-    TOKENIZER.with(|tokenizer_ref| {
-        let tokenizer = tokenizer_ref.borrow();
-        if let Some(tokenizer) = tokenizer.as_ref() {
-            let generated_text = tokenizer.decode(&output_ids, true).unwrap();
-            Ok(generated_text)
-        } else {
-            Err("Tokenizer not initialized".to_string())
-        }
-    })
-}
-
-pub fn bytes(filename: &str) -> Bytes {
-    std::fs::read(filename).unwrap().into()
-}
-
-pub fn append_bytes(filename: &str, bytes: Vec<u8>) {
-    let mut file = std::fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(filename)
-        .unwrap();
-    file.write_all(&bytes).unwrap();
+fn get_output_text(output_ids: Vec<u32>) -> Result<String, String> {
+    let output_text = decode_output(output_ids);
+    output_text
 }
 
 ic_cdk::export_candid!();
