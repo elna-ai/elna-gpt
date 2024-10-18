@@ -70,8 +70,17 @@ pub fn get_token_ids(text: &str) -> Result<(Vec<i64>), String> {
         }
     })
 }
-
-// pub fn decode_output(output_ids: Vec<u32>)->
+pub fn decode_output(output_ids: Vec<u32>) -> Result<String, String> {
+    TOKENIZER.with(|tokenizer_ref| {
+        let tokenizer = tokenizer_ref.borrow();
+        if let Some(tokenizer) = tokenizer.as_ref() {
+            let generated_text = tokenizer.decode(&output_ids, true).unwrap();
+            Ok(generated_text)
+        } else {
+            Err("Tokenizer not initialized".to_string())
+        }
+    })
+}
 
 pub fn bytes(filename: &str) -> Bytes {
     std::fs::read(filename).unwrap().into()
