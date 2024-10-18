@@ -12,6 +12,7 @@ type Result_1 = variant { Ok; Err : text };
 service : (principal) -> {
   append_model_bytes : (blob) -> ();
   append_weights_bytes : (blob) -> ();
+  clear_model_bytes : () -> ();
   model_inference : (text) -> (Result);
   setup : () -> (Result_1);
   test_model : (vec int64) -> (vec nat32);

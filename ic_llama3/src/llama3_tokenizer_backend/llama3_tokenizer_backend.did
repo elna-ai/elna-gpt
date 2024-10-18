@@ -3,6 +3,7 @@ type Result_1 = variant { Ok : vec int64; Err : text };
 type Result_2 = variant { Ok; Err : text };
 service : () -> {
   append_tokenizer_bytes : (blob) -> ();
+  clear_tokenizer_bytes : () -> ();
   get_output_text : (vec nat32) -> (Result) query;
   get_token_ids : (text) -> (Result_1) query;
   setup : () -> (Result_2);
