@@ -1,17 +1,25 @@
 mod onnx;
-pub mod storage;
+mod storage;
+mod tokenizer;
+
+use candid::Principal;
+use ic_cdk::api::call::RejectionCode;
 use ic_stable_structures::{
     memory_manager::{MemoryId, MemoryManager},
     DefaultMemoryImpl,
 };
 use onnx::setup_model;
 use std::cell::RefCell;
+use tokenizer::{decode, encode};
 
 const WASI_MEMORY_ID: MemoryId = MemoryId::new(0);
 const MODEL_FILE: &str = "model.onnx";
 // const TOKENIZER_FILE: &str = "tokenizer.json";
 
 thread_local! {
+
+    static TOKENIZER: RefCell<String> = RefCell::new(String::new());
+
     // The memory manager is used for simulating multiple memories.
     static MEMORY_MANAGER: RefCell<MemoryManager<DefaultMemoryImpl>> =
         RefCell::new(MemoryManager::init(DefaultMemoryImpl::default()));
@@ -25,15 +33,31 @@ thread_local! {
 // }
 #[target_feature(enable = "simd128")]
 #[ic_cdk::update]
-pub fn model_inference(token_ids: Vec<i64>) -> Result<Vec<u32>, String> {
-    onnx::run(token_ids).map_err(|err| err.to_string())
+async fn model_inference(text: String) -> Result<String, (RejectionCode, std::string::String)> {
+    let result = encode(text).await;
+    match result {
+        Ok(token_ids) => {
+            let llm_result = onnx::run(token_ids).map_err(|err| err.to_string());
+            match llm_result {
+                Ok(token_ids) => {
+                    let text = decode(token_ids).await;
+                    text
+                }
+                Err(rejection) => Err((RejectionCode::CanisterReject, rejection)),
+            }
+        }
+
+        Err(rejection) => Err(rejection),
+    }
 }
 
 #[ic_cdk::init]
-fn init() {
+fn init(canister_id: Principal) {
     // Initialize ic_wasi_polyfill with a memory manager.
     let wasi_memory = MEMORY_MANAGER.with(|m| m.borrow().get(WASI_MEMORY_ID));
     ic_wasi_polyfill::init_with_memory(&[0u8; 32], &[], wasi_memory);
+
+    TOKENIZER.with(|o| *o.borrow_mut() = canister_id.to_string());
 }
 
 #[ic_cdk::post_upgrade]
