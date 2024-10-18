@@ -56,7 +56,8 @@ pub fn setup_tokenizer(bytes: Bytes) -> Result<(), ()> {
     Ok(()) // Return Ok(()) after saving the tokenizer
 }
 
-pub fn get_token_ids(text: &str) -> Result<(Vec<i64>), String> {
+#[ic_cdk::update]
+pub fn get_token_ids(text: String) -> Result<Vec<i64>, String> {
     TOKENIZER.with(|tokenizer_ref| {
         let tokenizer = tokenizer_ref.borrow();
         if let Some(tokenizer) = tokenizer.as_ref() {
@@ -70,6 +71,8 @@ pub fn get_token_ids(text: &str) -> Result<(Vec<i64>), String> {
         }
     })
 }
+
+#[ic_cdk::query]
 pub fn decode_output(output_ids: Vec<u32>) -> Result<String, String> {
     TOKENIZER.with(|tokenizer_ref| {
         let tokenizer = tokenizer_ref.borrow();
