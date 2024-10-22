@@ -1,6 +1,3 @@
-// extern crate ic_llama3_backend;
-// use ic_llama3_backend::storage;
-// use super::ic_llama3_backend;
 mod tokenizer;
 use ic_stable_structures::{
     memory_manager::{MemoryId, MemoryManager},
