@@ -1,0 +1,18 @@
+[package]
+name = "gpt2_tokenizer_backend"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+candid = "0.10"
+ic-cdk = "0.13"
+bytes = "1.5.0"
+ic-stable-structures = "0.6"
+ic-wasi-polyfill = "0.5"
+tokenizers = { version = "0.19.1", default-features = false, features = ["unstable_wasm"] }
+# ic_llama3_backend= { path= "../ic_llama3_backend"}

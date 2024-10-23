@@ -1,0 +1,6 @@
+[workspace]
+members = [
+    "src/ic_gpt2_backend",
+    "src/gpt2_tokenizer_backend"
+]
+resolver = "2"

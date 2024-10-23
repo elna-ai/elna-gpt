@@ -1,0 +1,40 @@
+{
+  "canisters": {
+    "ic_gpt2_backend": {
+      "metadata": [
+        {
+          "name": "candid:service"
+        }
+      ],
+      "candid": "src/ic_gpt2_backend/ic_gpt2_backend.did",
+      "package": "ic_gpt2_backend",
+      "type": "custom",
+      "wasm": "target/wasm32-wasi/release/ic_gpt2_backend.wasm",
+      "build": [
+        "bash scripts/build.sh ic_gpt2_backend"
+      ]
+    },
+    "gpt2_tokenizer_backend": {
+      "metadata": [
+        {
+          "name": "candid:service"
+        }
+      ],
+      "candid": "src/gpt2_tokenizer_backend/gpt2_tokenizer_backend.did",
+      "package": "gpt2_tokenizer_backend",
+      "type": "custom",
+      "wasm": "target/wasm32-wasi/release/gpt2_tokenizer_backend.wasm",
+      "build": [
+        "bash scripts/build.sh gpt2_tokenizer_backend"
+      ]
+    }
+  },
+  "defaults": {
+    "build": {
+      "args": "",
+      "packtool": ""
+    }
+  },
+  "output_env_file": ".env",
+  "version": 1
+}
