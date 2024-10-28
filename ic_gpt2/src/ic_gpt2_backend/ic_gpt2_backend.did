@@ -7,14 +7,12 @@ type RejectionCode = variant {
   SysFatal;
   CanisterReject;
 };
-type Result = variant { Ok; Err : text };
-type Result_1 = variant { Ok : text; Err : record { RejectionCode; text } };
+type Result = variant { Ok : text; Err : record { RejectionCode; text } };
+type Result_1 = variant { Ok; Err : text };
 service : (principal) -> {
   append_model_bytes : (blob) -> ();
-  append_model_bytes_with_hash : (blob, text) -> (Result);
-  append_weights_bytes : (blob) -> ();
   clear_model_bytes : () -> ();
-  model_inference : (text) -> (Result_1);
-  setup : () -> (Result);
+  model_inference : (text) -> (Result);
+  setup : () -> (Result_1);
   test_model : (vec int64) -> (vec nat32);
 }

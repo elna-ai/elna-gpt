@@ -9,12 +9,12 @@ use ic_stable_structures::{
     DefaultMemoryImpl,
 };
 use onnx::setup_model;
-use sha2::{Digest, Sha256}; // Add for hashing
+// use sha2::{Digest, Sha256}; // Add for hashing
 use std::cell::RefCell;
 use tokenizer::{decode, encode};
 const WASI_MEMORY_ID: MemoryId = MemoryId::new(0);
-const MODEL_FILE1: &str = "model.onnx";
-const MODEL_FILE2: &str = "9975db42-89df-11ef-b330-0242ac1c000c";
+const MODEL_FILE: &str = "model.onnx";
+// const MODEL_FILE2: &str = "9975db42-89df-11ef-b330-0242ac1c000c";
 
 thread_local! {
 
@@ -69,18 +69,13 @@ fn post_upgrade() {
 
 #[ic_cdk::update]
 fn clear_model_bytes() {
-    storage::clear_bytes(MODEL_FILE1);
+    storage::clear_bytes(MODEL_FILE);
 }
 // Appends the given chunk to the model file.
 // This is used for incremental chunk uploading of large files.
 #[ic_cdk::update]
 fn append_model_bytes(bytes: Vec<u8>) {
-    storage::append_bytes(MODEL_FILE1, bytes);
-}
-
-#[ic_cdk::update]
-fn append_weights_bytes(bytes: Vec<u8>) {
-    storage::append_bytes(MODEL_FILE2, bytes);
+    storage::append_bytes(MODEL_FILE, bytes);
 }
 
 #[ic_cdk::update]

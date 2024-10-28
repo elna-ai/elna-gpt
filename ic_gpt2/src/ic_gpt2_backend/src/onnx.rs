@@ -1,12 +1,12 @@
 use crate::storage;
-use crate::MODEL_FILE1;
+use crate::MODEL_FILE;
 
 use prost::Message;
 use std::cell::RefCell;
 use tract_ndarray::{ArrayD, IxDyn};
 use tract_onnx::prelude::*;
 
-const TARGET_LEN: usize = 256;
+// const TARGET_LEN: usize = 256;
 
 // Thread-local storage for model and tokenizer
 thread_local! {
@@ -14,7 +14,7 @@ thread_local! {
 }
 
 pub fn setup_model() -> TractResult<()> {
-    let bytes = storage::bytes(MODEL_FILE1);
+    let bytes = storage::bytes(MODEL_FILE);
     // if bytes.iter().any(|&b| b == 0) {
     //     ic_cdk::println!("null bytes")
     // }
