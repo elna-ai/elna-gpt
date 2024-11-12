@@ -61,10 +61,11 @@ fn init(canister_id: Principal) {
 }
 
 #[ic_cdk::post_upgrade]
-fn post_upgrade() {
+fn post_upgrade(canister_id: Principal) {
     // Reinitialize ic_wasi_polyfill after canister upgrade.
     let wasi_memory = MEMORY_MANAGER.with(|m| m.borrow().get(WASI_MEMORY_ID));
     ic_wasi_polyfill::init_with_memory(&[0u8; 32], &[], wasi_memory);
+    init(canister_id);
 }
 
 #[ic_cdk::update]

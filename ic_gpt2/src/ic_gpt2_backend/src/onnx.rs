@@ -6,7 +6,7 @@ use std::cell::RefCell;
 use tract_ndarray::{ArrayD, IxDyn};
 use tract_onnx::prelude::*;
 
-// const TARGET_LEN: usize = 256;
+const TARGET_LEN: usize = 10;
 
 // Thread-local storage for model and tokenizer
 thread_local! {
@@ -42,6 +42,8 @@ pub fn setup_model() -> TractResult<()> {
 // }
 
 pub fn run(token_ids: Vec<i64>) -> Result<Vec<u32>, anyhow::Error> {
+    let instructions_before = ic_cdk::api::instruction_counter();
+
     // Setup model and tokenizer
     MODEL.with(|model_cell| {
         let model_opt = model_cell.borrow();
@@ -63,8 +65,13 @@ pub fn run(token_ids: Vec<i64>) -> Result<Vec<u32>, anyhow::Error> {
         // Create empty past key values tensor
         let mut past_key_values_tensor = create_empty_past_key_values(24, 1, 12, 0, 64)?;
 
+        let instructions = ic_cdk::api::instruction_counter() - instructions_before;
+
+        ic_cdk::println!("No of instructions in model setup:{}", instructions);
+        let instructions_before = ic_cdk::api::instruction_counter();
+
         // Generate tokens for a fixed number of steps or until stopping token
-        for _ in 0..5 {
+        for _ in 0..TARGET_LEN {
             // Convert input IDs and attention mask to tensors
             let input_ids_tensor = create_tensor_i64(&input_ids)?;
             let attention_mask_tensor = create_tensor_i8(&attention_mask)?;
@@ -75,6 +82,7 @@ pub fn run(token_ids: Vec<i64>) -> Result<Vec<u32>, anyhow::Error> {
                 attention_mask_tensor.into(),
                 past_key_values_tensor.clone().into()
             );
+            let instructions_before_run = ic_cdk::api::instruction_counter();
 
             // Run the model
             let outputs = match model.run(inputs) {
@@ -84,6 +92,8 @@ pub fn run(token_ids: Vec<i64>) -> Result<Vec<u32>, anyhow::Error> {
                     return Err(e);
                 }
             };
+            let instructions_after = ic_cdk::api::instruction_counter() - instructions_before_run;
+            ic_cdk::println!("No of instructions :{}", instructions_after);
 
             // Extract outputs: next token and updated past key values
             past_key_values_tensor = outputs[1].clone().into_tensor();
@@ -96,13 +106,20 @@ pub fn run(token_ids: Vec<i64>) -> Result<Vec<u32>, anyhow::Error> {
             }
 
             generated_tokens.push(next_token);
+            ic_cdk::println!("generated tokens:{:?}", generated_tokens);
+            let instructions = ic_cdk::api::instruction_counter() - instructions_before;
 
+            ic_cdk::println!("No of instructions per token: {}", instructions);
             // Prepare for the next iteration
             input_ids = vec![next_token];
             attention_mask.push(1);
         }
+        let instructions_before = ic_cdk::api::instruction_counter();
 
         let generated_tokens_u32: Vec<u32> = generated_tokens.iter().map(|&x| x as u32).collect();
+        let instructions = ic_cdk::api::instruction_counter() - instructions_before;
+        ic_cdk::println!("No of instructions  after: {}", instructions);
+
         // let final_output = tokenizer.decode(&generated_tokens_u32, false).unwrap();
 
         // Return the final generated text

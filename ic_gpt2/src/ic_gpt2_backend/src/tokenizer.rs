@@ -9,7 +9,7 @@ pub enum Result_ {
     Err(String),
 }
 
-#[derive(CandidType, Deserialize)]
+#[derive(CandidType, Deserialize, Debug)]
 pub enum Result1 {
     Ok(Vec<i64>),
     Err(String),
@@ -27,9 +27,11 @@ impl Service {
 
 pub async fn encode(text: String) -> Result<Vec<i64>, (RejectionCode, std::string::String)> {
     let canister_id = TOKENIZER.with(|owner| owner.borrow().clone());
+    ic_cdk::println!("Token Canister ID:{:?}", canister_id);
     let tokenizer = Service(Principal::from_text(canister_id).unwrap());
 
     let result = tokenizer.get_token_ids(text).await;
+    ic_cdk::println!("Tokens:{:?}", result);
 
     match result {
         Ok(result1) => match result1 {
