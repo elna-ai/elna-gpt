@@ -106,13 +106,18 @@ pub fn run(token_ids: Vec<i64>) -> Result<Vec<u32>, anyhow::Error> {
             }
 
             generated_tokens.push(next_token);
-            ic_cdk::println!("generated tokens:{:?}", generated_tokens);
-            let instructions = ic_cdk::api::instruction_counter() - instructions_before;
 
-            ic_cdk::println!("No of instructions per token: {}", instructions);
             // Prepare for the next iteration
+
             input_ids = vec![next_token];
             attention_mask.push(1);
+
+            ic_cdk::println!("generated tokens:{:?}", generated_tokens);
+            let instructions = ic_cdk::api::instruction_counter() - instructions_before;
+            ic_cdk::println!("No of instructions per token: {}", instructions);
+            if instructions > 350_000_000_00 {
+                break;
+            }
         }
         let instructions_before = ic_cdk::api::instruction_counter();
 
